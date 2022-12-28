@@ -1,6 +1,3 @@
 # interactive-shell
 
-echo
-copy
-move
-tasklist
+Currently supporting 'echo'
