@@ -69,7 +69,6 @@ int len_of_string_arr(char **strings) {
 }
 
 void free_string_arr(char **strings) {
-    int n = 0;
     char **tmp = strings;
 
     while (*tmp) {
@@ -86,12 +85,14 @@ char* join(char **strings, char *delim) {
     // count total length of all strings
     int count = 0, i = 0;
     for (i = 0; i < n; i++) {
+
         count += sizeof(*(strings+i));
     }
 
     // add space for delim
     int countDelim = n ? (n-1) * sizeof(delim) : 0;
-    count += countDelim; 
+    count += countDelim;
+    count++; // spaace for null terminating character  
 
     // allocate result
     char *res = (char*)malloc(sizeof(char)*count);
@@ -106,6 +107,7 @@ char* join(char **strings, char *delim) {
         *(res+index) = *delim;
         index += strlen(delim);
     }
+    *(res+index) = '\0';
 
     return res;
 }
