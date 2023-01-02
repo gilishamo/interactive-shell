@@ -111,3 +111,30 @@ char* join(char **strings, char *delim) {
 
     return res;
 }
+
+int copy_file(char* src, char* dst) {
+    int exitCode = 0;
+
+    FILE* srcFile = fopen(src, "r");
+    if (srcFile == NULL) {
+        printf("failed to open source file\n");
+        exitCode = 1;
+        goto cleanup;
+    }
+    FILE* dstFile = fopen(dst, "w+"); // wil override the dst file
+    if (dstFile == NULL) {
+        printf("failed to open destionation file\n");
+        exitCode = 1;
+        goto cleanup;
+    }
+
+    char c;
+    while ((c = fgetc(srcFile)) != EOF) {
+        fputc(c, dstFile); // todo check content eas copied successfully
+    }
+
+    cleanup:
+    fclose(srcFile);
+    fclose(dstFile);
+    return exitCode;
+}

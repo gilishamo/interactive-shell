@@ -27,26 +27,27 @@ interactiveShellHandler* allocate_interactive_shell_handler() {
 // TODO free interactive shell
 
 void handle_copy(char* src, char* dst) {
-    FILE* srcFile = fopen(src, "r");
-    if (srcFile == NULL) {
-        printf("failed to open source file\n");
-        goto cleanup;
-    }
-    FILE* dstFile = fopen(dst, "w+"); // wil override the dst file
-    if (dstFile == NULL) {
-        printf("failed to open destionation file\n");
-        goto cleanup;
-    }
+    int exitCode = 0;
 
-    char c;
-    while ((c = fgetc(srcFile)) != EOF) {
-        fputc(c, dstFile);
+    exitCode = copy_file(src, dst);
+    if (exitCode == 0) {
+        printf("copied source file to destination");
+    } else {
+        printf("failed to copy source file to destination");
     }
+}
 
-    cleanup:
-    fclose(srcFile);
-    fclose(dstFile);
-    printf("copied source file to destination");
+void handle_move(char* src, char* dst) {
+    int exitCode = copy_file(src, dst);
+    if (exitCode == 0) {
+        // delete src file 
+        exitCode = remove(src);
+        if (exitCode == 0) {
+            printf("moved file successfully");
+        } else {
+            printf("failed to moved file");
+        }
+    }
 }
 
 void start_shell() {
@@ -85,10 +86,15 @@ void perform_command(char *command) {
             goto cleanup;
         } 
         handle_copy(*(command_split+1), *(command_split+2));
-    // } else if (strcmp(*command_split, "move") == 0) {
-    //     // todo handle move
+    } else if (strcmp(*command_split, "move") == 0) {
+        // todo handle move
+        if (*(command_split+1) == NULL || *(command_split+2) == NULL){
+            printf("usage: 'move <src> <dst>'\n");
+            goto cleanup;
+        } 
+        handle_move(*(command_split+1), *(command_split+2));
     // } else if (strcmp(*command_split, "tasklist") == 0) {
-    //     // todo handle tasklist
+    // //     // todo handle tasklist
     } else if (strcmp(*command_split, "quit") == 0) {
         // quittign
         // left blamk intentionally 
