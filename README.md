@@ -1,3 +1,3 @@
 # interactive-shell
 
-Currently supporting 'echo'
+Currently supporting: 'echo', 'copy', 'move', 'tasklist'.

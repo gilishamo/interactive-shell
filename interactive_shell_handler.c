@@ -1,30 +1,15 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <windows.h>
+#include <psapi.h>
+#include <tchar.h>
 #include "interactive_shell_handler.h"
 #include "utils.h"
 
 // forward declarations
 void perform_command(char *command);
 char** split_command(char *command);
-
-typedef struct _interactiveShellHandler {
-    char* command; 
-} interactiveShellHandler;
-
-interactiveShellHandler* allocate_interactive_shell_handler() {
-    interactiveShellHandler *shell;
-
-    shell = (interactiveShellHandler*)malloc(sizeof(interactiveShellHandler));
-    if (shell == NULL) {
-        printf("ERROR: failed to allocate memmory\n");
-        exit(1);
-    } 
-
-    return shell;
-}
-
-// TODO free interactive shell
 
 void handle_copy(char* src, char* dst) {
     int exitCode = 0;
@@ -48,6 +33,64 @@ void handle_move(char* src, char* dst) {
             printf("failed to moved file");
         }
     }
+}
+
+void print_process_name_and_id (DWORD processId) {
+    TCHAR processName[MAX_PATH] = "<unknown>";
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+    if (hProcess != NULL) {
+        HMODULE hMod;
+        DWORD cbNeeded;
+
+        if(EnumProcessModulesEx(hProcess, &hMod, sizeof(hMod), &cbNeeded, LIST_MODULES_DEFAULT)) {
+            GetModuleBaseName(hProcess, hMod, processName, sizeof(processName)/sizeof(TCHAR));
+        }
+    }
+
+    printf("%s\t(PID: %u)\n", processName, processId);
+
+    CloseHandle(hProcess);
+}
+
+void handle_tasklist() {
+    #define getAProcessesSize(mult) (sizeof(DWORD)*PROCESS_LIST_STARTING_LEN*mult)
+
+    DWORD* aProcesses;
+    DWORD cbNeeded, cProcesses;
+    int mult = 1;
+    int aProcesessesSize = getAProcessesSize(mult);
+
+    aProcesses = (DWORD*)malloc(aProcesessesSize);
+    if (!EnumProcesses(aProcesses, aProcesessesSize, &cbNeeded)) {
+        printf("tasklist failed");
+        return;
+    }
+
+    if (cbNeeded == aProcesessesSize) {
+        do {
+            mult++;
+            free(aProcesses);
+            aProcesessesSize = getAProcessesSize(mult);
+            aProcesses = (DWORD*)malloc(aProcesessesSize);
+            if (!EnumProcesses(aProcesses, aProcesessesSize, &cbNeeded)) {
+                printf("tasklist failed");
+                return;
+            }
+        } while(cbNeeded == aProcesessesSize);
+    }
+
+     // claculate how may process identifiers were returned
+    cProcesses = cbNeeded / sizeof(DWORD);
+
+    // print name and process identifiers
+    int i; 
+    for ( i = 0; i < cProcesses; i++ ) {
+        if ( aProcesses[i] != 0 ) {
+            print_process_name_and_id(aProcesses[i]);
+        }
+    }
+
+    free(aProcesses);
 }
 
 void start_shell() {
@@ -93,8 +136,8 @@ void perform_command(char *command) {
             goto cleanup;
         } 
         handle_move(*(command_split+1), *(command_split+2));
-    // } else if (strcmp(*command_split, "tasklist") == 0) {
-    // //     // todo handle tasklist
+    } else if (strcmp(*command_split, "tasklist") == 0) {
+         handle_tasklist();
     } else if (strcmp(*command_split, "quit") == 0) {
         // quittign
         // left blamk intentionally 
