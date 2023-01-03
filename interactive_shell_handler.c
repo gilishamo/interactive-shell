@@ -1,0 +1,150 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <windows.h>
+#include <psapi.h>
+#include <tchar.h>
+#include "interactive_shell_handler.h"
+#include "utils.h"
+
+// forward declarations
+void perform_command(char *command);
+char** split_command(char *command);
+
+void handle_copy(char* src, char* dst) {
+    int exitCode = 0;
+
+    exitCode = copy_file(src, dst);
+    if (exitCode == 0) {
+        printf("copied source file to destination");
+    } else {
+        printf("failed to copy source file to destination");
+    }
+}
+
+void handle_move(char* src, char* dst) {
+    int exitCode = copy_file(src, dst);
+    if (exitCode == 0) {
+        // delete src file 
+        exitCode = remove(src);
+        if (exitCode == 0) {
+            printf("moved file successfully");
+        } else {
+            printf("failed to moved file");
+        }
+    }
+}
+
+void print_process_name_and_id (DWORD processId) {
+    TCHAR processName[MAX_PATH] = "<unknown>";
+    HANDLE hProcess = OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, FALSE, processId);
+    if (hProcess != NULL) {
+        HMODULE hMod;
+        DWORD cbNeeded;
+
+        if(EnumProcessModulesEx(hProcess, &hMod, sizeof(hMod), &cbNeeded, LIST_MODULES_DEFAULT)) {
+            GetModuleBaseName(hProcess, hMod, processName, sizeof(processName)/sizeof(TCHAR));
+        }
+    }
+
+    printf("%s\t(PID: %u)\n", processName, processId);
+
+    CloseHandle(hProcess);
+}
+
+void handle_tasklist() {
+    #define getAProcessesSize(mult) (sizeof(DWORD)*PROCESS_LIST_STARTING_LEN*mult)
+
+    DWORD* aProcesses;
+    DWORD cbNeeded, cProcesses;
+    int mult = 1;
+    int aProcesessesSize = getAProcessesSize(mult);
+
+    aProcesses = (DWORD*)malloc(aProcesessesSize);
+    if (!EnumProcesses(aProcesses, aProcesessesSize, &cbNeeded)) {
+        printf("tasklist failed");
+        return;
+    }
+
+    if (cbNeeded == aProcesessesSize) {
+        do {
+            mult++;
+            free(aProcesses);
+            aProcesessesSize = getAProcessesSize(mult);
+            aProcesses = (DWORD*)malloc(aProcesessesSize);
+            if (!EnumProcesses(aProcesses, aProcesessesSize, &cbNeeded)) {
+                printf("tasklist failed");
+                return;
+            }
+        } while(cbNeeded == aProcesessesSize);
+    }
+
+     // claculate how may process identifiers were returned
+    cProcesses = cbNeeded / sizeof(DWORD);
+
+    // print name and process identifiers
+    int i; 
+    for ( i = 0; i < cProcesses; i++ ) {
+        if ( aProcesses[i] != 0 ) {
+            print_process_name_and_id(aProcesses[i]);
+        }
+    }
+
+    free(aProcesses);
+}
+
+void start_shell() {
+    char command[COMMAND_MAX_LEN];
+
+    printf("Starting interactive shell, send 'quit' to quit the program\n");
+
+    do {
+        printf("# ");
+        // read input until new line
+        if (fgets(command, COMMAND_MAX_LEN, stdin) != NULL)  { // TODO fix case of input > COMMAND_MAX_LEN
+            int index = strlen(command)-1;
+            *(command+index) == '\n' ? *(command+index) = '\0' : printf("command is too long"); 
+            perform_command(command);
+        }
+        printf("\n");
+    } while (strcmp(command, "quit") != 0);
+   
+    printf("quitting...\n");
+}
+
+char** split_command(char *command) {
+    return split_str(command, " ");
+}
+
+void perform_command(char *command) {
+    char **command_split = split_command(command);
+
+    if (strcmp(*command_split, "echo") == 0) {
+        char* message = join(command_split+1, " ");
+        printf("%s", message);
+    } else if (strcmp(*command_split, "copy") == 0) {
+        // todo handle copy
+        if (*(command_split+1) == NULL || *(command_split+2) == NULL){
+            printf("usage: 'copy <src> <dst>'\n");
+            goto cleanup;
+        } 
+        handle_copy(*(command_split+1), *(command_split+2));
+    } else if (strcmp(*command_split, "move") == 0) {
+        // todo handle move
+        if (*(command_split+1) == NULL || *(command_split+2) == NULL){
+            printf("usage: 'move <src> <dst>'\n");
+            goto cleanup;
+        } 
+        handle_move(*(command_split+1), *(command_split+2));
+    } else if (strcmp(*command_split, "tasklist") == 0) {
+         handle_tasklist();
+    } else if (strcmp(*command_split, "quit") == 0) {
+        // quittign
+        // left blamk intentionally 
+    } else {
+        printf("command '%s' is not supported", *command_split);
+    }
+
+    cleanup:
+    free_string_arr(command_split);
+}
